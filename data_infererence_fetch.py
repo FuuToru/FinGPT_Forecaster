@@ -8,7 +8,7 @@ from collections import defaultdict
 from data import get_news
 from prompt import get_company_prompt, get_prompt_by_row, sample_news
 
-finnhub_client = finnhub.Client(api_key=os.environ.get("FINNHUB_KEY"))
+finnhub_client = finnhub.Client(api_key="cql5f59r01qn7frre8b0cql5f59r01qn7frre8bg")
 
 
 def get_curday():

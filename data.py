@@ -17,8 +17,8 @@ from openai import OpenAI
 from indices import *
 from prompt import get_all_prompts
 
-finnhub_client = finnhub.Client(api_key=os.environ.get("FINNHUB_KEY"))
-client = OpenAI(api_key=os.environ.get("OPENAI_KEY"))
+finnhub_client = finnhub.Client(api_key="cql5f59r01qn7frre8b0cql5f59r01qn7frre8bg")
+client = OpenAI(api_key="sk-proj-HBPhjWpX8Kk6SJ63e5g0T3BlbkFJ0GIxjLQDHoV72FYFXROp")
 
 
 # ----------------------------------------------------------------------------------- #

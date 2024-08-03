@@ -15,8 +15,8 @@ from datetime import date, datetime, timedelta
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 
 
-access_token = os.environ["HF_TOKEN"]
-finnhub_client = finnhub.Client(api_key=os.environ["FINNHUB_API_KEY"])
+access_token = "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"
+finnhub_client = finnhub.Client(api_key="cql5f59r01qn7frre8b0cql5f59r01qn7frre8bg")
 
 base_model = AutoModelForCausalLM.from_pretrained(
     'meta-llama/Llama-2-7b-chat-hf',
