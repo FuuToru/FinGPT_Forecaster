@@ -268,20 +268,25 @@ def create_dataset(symbol_list, data_dir, start_date, end_date, train_ratio=0.8,
     test_dataset_list = []
 
     for symbol in symbol_list:
+        try:
 
-        data_dict = gpt4_to_llama(symbol, data_dir, start_date, end_date,  with_basics)
-        print(data_dict['prompt'][-1])
-        print(data_dict['answer'][-1])
-        symbols = [symbol] * len(data_dict['label'])
-        data_dict.update({"symbol": symbols})
+            data_dict = gpt4_to_llama(symbol, data_dir, start_date, end_date,  with_basics)
+            print(data_dict['prompt'][-1])
+            print(data_dict['answer'][-1])
+            symbols = [symbol] * len(data_dict['label'])
+            data_dict.update({"symbol": symbols})
 
-        dataset = Dataset.from_dict(data_dict)
-        train_size = round(train_ratio * len(dataset))
+            dataset = Dataset.from_dict(data_dict)
+            train_size = round(train_ratio * len(dataset))
 
-        train_dataset_list.append(dataset.select(range(train_size)))
-        if train_size >= len(dataset):
+            train_dataset_list.append(dataset.select(range(train_size)))
+            if train_size >= len(dataset):
+                continue
+            test_dataset_list.append(dataset.select(range(train_size, len(dataset))))
+        except Exception as e:
+            print(f"An error occurred for symbol {symbol}: {e}")
             continue
-        test_dataset_list.append(dataset.select(range(train_size, len(dataset))))
+            
 
     train_dataset = datasets.concatenate_datasets(train_dataset_list)
     test_dataset = datasets.concatenate_datasets(test_dataset_list)
