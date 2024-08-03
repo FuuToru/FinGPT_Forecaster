@@ -13,13 +13,18 @@ from collections import defaultdict
 import datasets
 from datasets import Dataset
 from openai import OpenAI
+import google.generativeai as genai
 
 from indices import *
 from prompt import get_all_prompts
 
 finnhub_client = finnhub.Client(api_key="cql5f59r01qn7frre8b0cql5f59r01qn7frre8bg")
-client = OpenAI(api_key="sk-nZhsQvP86e32xkILCqPs30ePBU44b45_cVD1WTbb-8T3BlbkFJSdgHgpv6kAVIO_NHK-Rm7bEidGzIxUa04cooOi-bIA")
 
+genai.configure(api_key="AIzaSyAoAU_SQ0Z9G7tNm-5GNoCYJqmsqpZOjgM")
+
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-pro',
+    tools='code_execution')
 
 # ----------------------------------------------------------------------------------- #
 # ---------------------------- RAW FINANCIAL ACQUISITION ---------------------------- #
@@ -175,19 +180,15 @@ def query_gpt4(symbol_list, data_dir, start_date, end_date, min_past_weeks=1, ma
             cnt = 0
             while cnt < 5:
                 try:
-                    completion = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                          ]
+                    completion = model.generate_content(
+                        prompt
                     )
                     break    
                 except Exception:
                     cnt += 1
                     print(f'retry cnt {cnt}')
             
-            answer = completion.choices[0].message.content if cnt < 5 else ""
+            answer = completion.text if cnt < 5 else ""
             append_to_csv(csv_file, prompt, answer)
 
 
