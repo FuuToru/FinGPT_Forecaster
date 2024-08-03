@@ -18,7 +18,7 @@ from indices import *
 from prompt import get_all_prompts
 
 finnhub_client = finnhub.Client(api_key="cql5f59r01qn7frre8b0cql5f59r01qn7frre8bg")
-client = OpenAI(api_key="sk-proj-HBPhjWpX8Kk6SJ63e5g0T3BlbkFJ0GIxjLQDHoV72FYFXROp")
+client = OpenAI(api_key="sk-nZhsQvP86e32xkILCqPs30ePBU44b45_cVD1WTbb-8T3BlbkFJSdgHgpv6kAVIO_NHK-Rm7bEidGzIxUa04cooOi-bIA")
 
 
 # ----------------------------------------------------------------------------------- #
@@ -269,8 +269,8 @@ def create_dataset(symbol_list, data_dir, start_date, end_date, train_ratio=0.8,
     for symbol in symbol_list:
 
         data_dict = gpt4_to_llama(symbol, data_dir, start_date, end_date,  with_basics)
-#         print(data_dict['prompt'][-1])
-#         print(data_dict['answer'][-1])
+        print(data_dict['prompt'][-1])
+        print(data_dict['answer'][-1])
         symbols = [symbol] * len(data_dict['label'])
         data_dict.update({"symbol": symbols})
 
