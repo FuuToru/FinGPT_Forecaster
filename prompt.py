@@ -23,12 +23,23 @@ def get_company_prompt(symbol):
     return formatted_str
 
 
+def get_crypto_prompt(symbol):
+
+    profile = yf.Ticker(symbol).info
+
+    crpyto_template = """[Cryptocurrency Introduction]: {description}. It has a market capilization of {marketCap}."""
+    
+    formatted_str = crpyto_template.format(**profile)
+    
+    return formatted_str
+
+
 def get_prompt_by_row(symbol, row):
 
     start_date = row['Start Date'] if isinstance(row['Start Date'], str) else row['Start Date'].strftime('%Y-%m-%d')
     end_date = row['End Date'] if isinstance(row['End Date'], str) else row['End Date'].strftime('%Y-%m-%d')
     term = 'increased' if row['End Price'] > row['Start Price'] else 'decreased'
-    head = "From {} to {}, {}'s stock price {} from {:.2f} to {:.2f}. Company news during this period are listed below:\n\n".format(
+    head = "From {} to {}, {}'s stock price {} from {:.2f} to {:.2f}. News during this period are listed below:\n\n".format(
         start_date, end_date, symbol, term, row['Start Price'], row['End Price'])
     
     news = json.loads(row["News"])
@@ -44,6 +55,22 @@ def get_prompt_by_row(symbol, row):
         basics = "[Basic Financials]:\n\nNo basic financial reported."
     
     return head, news, basics
+
+
+def get_crypto_prompt_by_row(symbol, row):
+
+    start_date = row['Start Date'] if isinstance(row['Start Date'], str) else row['Start Date'].strftime('%Y-%m-%d')
+    end_date = row['End Date'] if isinstance(row['End Date'], str) else row['End Date'].strftime('%Y-%m-%d')
+    term = 'increased' if row['End Price'] > row['Start Price'] else 'decreased'
+    head = "From {} to {}, {}'s stock price {} from {:.2f} to {:.2f}. News during this period are listed below:\n\n".format(
+        start_date, end_date, symbol, term, row['Start Price'], row['End Price'])
+    
+    news = json.loads(row["News"])
+    news = ["[Headline]: {}\n[Summary]: {}\n".format(
+        n['headline'], n['summary']) for n in news if n['date'][:8] <= end_date.replace('-', '') and \
+        not n['summary'].startswith("Looking for stock market analysis and research with proves results?")]
+
+    return head, news, None
 
 
 def sample_news(news, k=5):
@@ -67,16 +94,26 @@ def map_bin_label(bin_lb):
     
     return lb
 
+PROMPT_END = {
+    "company": "\n\nBased on all the information before {start_date}, let's first analyze the positive developments and potential concerns for {symbol}. Come up with 2-4 most important factors respectively and keep them concise. Most factors should be inferred from company related news. " \
+        "Then let's assume your prediction for next week ({start_date} to {end_date}) is {prediction}. Provide a summary analysis to support your prediction. The prediction result need to be inferred from your analysis at the end, and thus not appearing as a foundational factor of your analysis.",
 
-def get_all_prompts(symbol, min_past_weeks=1, max_past_weeks=3, with_basics=True):
+    "crypto": "\n\nBased on all the information before {start_date}, let's first analyze the positive developments and potential concerns for {symbol}. Come up with 2-4 most important factors respectively and keep them concise. Most factors should be inferred from cryptocurrencies related news. " \
+        "Then let's assume your prediction for next week ({start_date} to {end_date}) is {prediction}. Provide a summary analysis to support your prediction. The prediction result need to be inferred from your analysis at the end, and thus not appearing as a foundational factor of your analysis."
+}
+
+def get_all_prompts(symbol, data_dir, start_date, end_date, min_past_weeks=1, max_past_weeks=3, with_basics=True):
 
     
     if with_basics:
-        df = pd.read_csv(f'{DATA_DIR}/{symbol}_{START_DATE}_{END_DATE}.csv')
+        df = pd.read_csv(f'{data_dir}/{symbol}_{start_date}_{end_date}.csv')
     else:
-        df = pd.read_csv(f'{DATA_DIR}/{symbol}_{START_DATE}_{END_DATE}_nobasics.csv')
+        df = pd.read_csv(f'{data_dir}/{symbol}_{start_date}_{end_date}_nobasics.csv')
     
-    company_prompt = get_company_prompt(symbol)
+    if symbol in CRYPTO:
+        info_prompt = get_crypto_prompt(symbol)
+    else:
+        info_prompt = get_company_prompt(symbol)
 
     prev_rows = []
     all_prompts = []
@@ -99,7 +136,10 @@ def get_all_prompts(symbol, min_past_weeks=1, max_past_weeks=3, with_basics=True
                 else:
                     prompt += "No relative news reported."
 
-        head, news, basics = get_prompt_by_row(symbol, row)
+        if symbol in CRYPTO:
+            head, news, basics = get_crypto_prompt_by_row(symbol, row)
+        else:
+            head, news, basics = get_prompt_by_row(symbol, row)
 
         prev_rows.append((head, news, basics))
         if len(prev_rows) > max_past_weeks:
@@ -109,10 +149,18 @@ def get_all_prompts(symbol, min_past_weeks=1, max_past_weeks=3, with_basics=True
             continue
 
         prediction = map_bin_label(row['Bin Label'])
-        
-        prompt = company_prompt + '\n' + prompt + '\n' + basics
-        prompt += f"\n\nBased on all the information before {row['Start Date']}, let's first analyze the positive developments and potential concerns for {symbol}. Come up with 2-4 most important factors respectively and keep them concise. Most factors should be inferred from company related news. " \
-            f"Then let's assume your prediction for next week ({row['Start Date']} to {row['End Date']}) is {prediction}. Provide a summary analysis to support your prediction. The prediction result need to be inferred from your analysis at the end, and thus not appearing as a foundational factor of your analysis."
+        info_prompt = info_prompt if info_prompt is not None else ""
+        prompt = prompt if prompt is not None else ""
+        basics = basics if basics is not None else ""
+
+        prompt = info_prompt + '\n' + prompt + '\n' + basics
+
+        prompt += PROMPT_END['crypto' if symbol in CRYPTO else 'company'].format(
+            start_date=row['Start Date'],
+            end_date=row['End Date'],
+            prediction=prediction,
+            symbol=symbol
+        )
 
         all_prompts.append(prompt.strip())
     
