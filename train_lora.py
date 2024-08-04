@@ -82,47 +82,54 @@ class GenerationEvalCallback(TrainerCallback):
 def main(args):
         
     model_name = parse_model_name(args.base_model, args.from_remote)
-    
-    # load model
+    token = "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"
+
+    # Load model with token
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        # load_in_8bit=True,
+        use_auth_token=token,
         trust_remote_code=True
     )
     if args.local_rank == 0:
         print(model)
-    
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        use_auth_token=token,
+        trust_remote_code=True
+    )
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
-    
-    # load data
+
+    # Load data
     dataset_fname = "./data/" + args.dataset
     dataset_list = load_dataset(dataset_fname, args.from_remote)
-    
+
     dataset_train = datasets.concatenate_datasets([d['train'] for d in dataset_list]).shuffle(seed=42)
-    
+
     if args.test_dataset:
         test_dataset_fname = "./data/" + args.test_dataset
         dataset_list = load_dataset(test_dataset_fname, args.from_remote)
-            
+
     dataset_test = datasets.concatenate_datasets([d['test'] for d in dataset_list])
-    
+
     original_dataset = datasets.DatasetDict({'train': dataset_train, 'test': dataset_test})
-    
-    eval_dataset = original_dataset['test'].shuffle(seed=42).select(range(50))
-    
+
+    # Check the size of the dataset and adjust the selection
+    num_examples = min(len(original_dataset['test']), 50)
+    eval_dataset = original_dataset['test'].shuffle(seed=42).select(range(num_examples))
+
     dataset = original_dataset.map(partial(tokenize, args, tokenizer))
-    print('original dataset length: ', len(dataset['train']))
+    print('Original dataset length: ', len(dataset['train']))
     dataset = dataset.filter(lambda x: not x['exceed_max_length'])
-    print('filtered dataset length: ', len(dataset['train']))
+    print('Filtered dataset length: ', len(dataset['train']))
     dataset = dataset.remove_columns(
         ['prompt', 'answer', 'label', 'symbol', 'period', 'exceed_max_length']
     )
-    
+
     current_time = datetime.now()
     formatted_time = current_time.strftime('%Y%m%d%H%M')
-    
+
     training_args = TrainingArguments(
         output_dir=f'finetuned_models/{args.run_name}_{formatted_time}', # 保存位置
         logging_steps=args.log_interval,
@@ -144,16 +151,14 @@ def main(args):
         report_to='wandb',
         run_name=args.run_name
     )
-    
+
     model.gradient_checkpointing_enable()
     model.enable_input_require_grads()
     model.is_parallelizable = True
     model.model_parallel = True
     model.model.config.use_cache = False
-    
-    # model = prepare_model_for_int8_training(model)
 
-    # setup peft
+    # Setup peft
     peft_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
@@ -164,7 +169,7 @@ def main(args):
         bias='none',
     )
     model = get_peft_model(model, peft_config)
-    
+
     # Train
     trainer = Trainer(
         model=model, 
@@ -183,15 +188,16 @@ def main(args):
             )
         ]
     )
-    
+
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
-    
+
     torch.cuda.empty_cache()
     trainer.train()
 
-    # save model
+    # Save model
     model.save_pretrained(training_args.output_dir)
+
 
 
 if __name__ == "__main__":
